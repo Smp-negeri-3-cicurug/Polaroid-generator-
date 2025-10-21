@@ -149,6 +149,7 @@ const progressBars = {
 };
 
 let uploadedImages = { img1: null, img2: null };
+let generatedPolaroidData = null; // Store the base64 data
 
 // Setup upload handlers
 Object.keys(uploadBoxes).forEach(key => {
@@ -259,6 +260,9 @@ document.getElementById('generateBtn').addEventListener('click', async () => {
     const polaroidImg = document.getElementById('polaroidImg');
     const resultSection = document.getElementById('resultSection');
 
+    // GANTI dengan URL Vercel Anda
+    const API_URL = 'https://your-backend.vercel.app/api/upload';
+
     try {
         loading.classList.add('show');
         result.classList.remove('show');
@@ -266,24 +270,28 @@ document.getElementById('generateBtn').addEventListener('click', async () => {
 
         showNotification('Membuat polaroid...', 'info');
 
-        // Call backend API
-        // GANTI URL INI dengan URL Vercel Anda setelah deploy
-        const API_URL = 'https://your-backend.vercel.app/api/upload';
-        
+        // Call backend API dengan timeout
+        const controller = new AbortController();
+        const timeoutId = setTimeout(() => controller.abort(), 60000); // 60 second timeout
+
         const response = await fetch(API_URL, {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json',
+                'Accept': 'application/json'
             },
             body: JSON.stringify({
                 img1: uploadedImages.img1,
                 img2: uploadedImages.img2
-            })
+            }),
+            signal: controller.signal
         });
 
+        clearTimeout(timeoutId);
+
         if (!response.ok) {
-            const errorData = await response.json();
-            throw new Error(errorData.message || 'API error');
+            const errorData = await response.json().catch(() => ({}));
+            throw new Error(errorData.message || `HTTP error! status: ${response.status}`);
         }
 
         const data = await response.json();
@@ -292,59 +300,139 @@ document.getElementById('generateBtn').addEventListener('click', async () => {
             throw new Error('Invalid response from server');
         }
 
+        // Store the base64 data for download
+        generatedPolaroidData = data.image;
+
+        // Display image dengan CORS-safe method
+        // Gunakan base64 data URL langsung
         polaroidImg.src = data.image;
+        
         polaroidImg.onload = () => {
             loading.classList.remove('show');
             result.classList.add('show');
-            showNotification('Polaroid berhasil dibuat!', 'success');
+            
+            // Show download and reset buttons
+            document.querySelector('.result-actions').style.display = 'flex';
+            
+            showNotification('Polaroid berhasil dibuat! 🎉', 'success');
+            
+            // Scroll to result smoothly
+            setTimeout(() => {
+                result.scrollIntoView({ behavior: 'smooth', block: 'center' });
+            }, 100);
+        };
+
+        polaroidImg.onerror = () => {
+            loading.classList.remove('show');
+            throw new Error('Failed to load generated image');
         };
 
     } catch (error) {
         console.error('Generate error:', error);
         loading.classList.remove('show');
         
-        // Show detailed error modal
-        const errorDetails = `
+        let errorMessage = 'Gagal membuat polaroid';
+        let errorDetails = `
 Error Type: ${error.name || 'Unknown'}
 Error Message: ${error.message || 'Unknown error'}
 Timestamp: ${new Date().toISOString()}
 API URL: ${API_URL}
 
+Possible causes:
+- Network connection issue
+- Backend server is down
+- API rate limit exceeded
+- Invalid image format
+
 Stack Trace:
 ${error.stack || 'No stack trace available'}
         `.trim();
+
+        if (error.name === 'AbortError') {
+            errorMessage = 'Request timeout';
+            errorDetails = 'The request took too long to complete. Please try again with smaller images.';
+        }
         
-        showErrorModal(error, errorDetails);
-        showNotification('Gagal membuat polaroid', 'error');
+        showErrorModal(new Error(errorMessage), errorDetails);
+        showNotification(errorMessage, 'error');
     }
 });
 
-// Download
-document.getElementById('downloadBtn').addEventListener('click', () => {
-    const img = document.getElementById('polaroidImg');
-    const link = document.createElement('a');
-    link.href = img.src;
-    link.download = `polaroid-${Date.now()}.png`;
-    link.click();
-    showNotification('Download dimulai...', 'success');
+// Download dengan CORS-safe method
+document.getElementById('downloadBtn').addEventListener('click', async () => {
+    try {
+        if (!generatedPolaroidData) {
+            showNotification('Tidak ada gambar untuk diunduh', 'error');
+            return;
+        }
+
+        // Method 1: Direct download dari base64 data
+        const link = document.createElement('a');
+        link.href = generatedPolaroidData;
+        link.download = `polaroid-${Date.now()}.png`;
+        
+        // Trigger download
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+        
+        showNotification('Download berhasil! 📥', 'success');
+
+    } catch (error) {
+        console.error('Download error:', error);
+        
+        // Fallback: Open in new tab
+        try {
+            const newWindow = window.open();
+            newWindow.document.write(`
+                <html>
+                    <head><title>Polaroid Result</title></head>
+                    <body style="margin:0;display:flex;justify-content:center;align-items:center;min-height:100vh;background:#000;">
+                        <img src="${generatedPolaroidData}" style="max-width:100%;height:auto;">
+                    </body>
+                </html>
+            `);
+            showNotification('Gambar dibuka di tab baru. Klik kanan > Save Image', 'info');
+        } catch (fallbackError) {
+            showNotification('Gagal mendownload. Coba klik kanan pada gambar > Save Image', 'error');
+        }
+    }
 });
 
-// Reset
+// Reset - Clear everything
 document.getElementById('resetBtn').addEventListener('click', () => {
+    // Clear file inputs
     fileInputs[1].value = '';
     fileInputs[2].value = '';
+    
+    // Remove file states
     uploadBoxes[1].classList.remove('has-file');
     uploadBoxes[2].classList.remove('has-file');
+    
+    // Clear previews
     previews[1].classList.remove('show');
     previews[2].classList.remove('show');
     previews[1].innerHTML = '';
     previews[2].innerHTML = '';
+    
+    // Reset data
     uploadedImages = { img1: null, img2: null };
+    generatedPolaroidData = null;
+    
+    // Hide result
     document.getElementById('result').classList.remove('show');
+    document.getElementById('loading').classList.remove('show');
+    
+    // Hide buttons
+    document.querySelector('.result-actions').style.display = 'none';
+    
+    // Reset button
     checkGenerateButton();
     
+    // Scroll to top
     window.scrollTo({ top: 0, behavior: 'smooth' });
-    showNotification('Siap untuk polaroid baru!', 'success');
+    
+    showNotification('Siap untuk polaroid baru! ✨', 'success');
 });
 
 // Notification System
@@ -365,7 +453,6 @@ function showNotification(message, type = 'info') {
 
 // Error Modal System
 function showErrorModal(error, details = null) {
-    // Remove existing error modal if any
     const existingModal = document.querySelector('.error-modal');
     if (existingModal) existingModal.remove();
 
@@ -399,7 +486,6 @@ function showErrorModal(error, details = null) {
 
     document.body.appendChild(modal);
 
-    // Close on backdrop click
     modal.addEventListener('click', (e) => {
         if (e.target === modal) {
             modal.remove();
@@ -407,14 +493,6 @@ function showErrorModal(error, details = null) {
     });
 }
 
-// Copy error to clipboard
-function copyErrorToClipboard(errorText) {
-    navigator.clipboard.writeText(errorText).then(() => {
-        showNotification('Error copied to clipboard', 'success');
-    }).catch(() => {
-        showNotification('Failed to copy error', 'error');
-    });
-}
-
 console.log('🌟 Polaroid Generator Ready!');
 console.log('✨ Created by Ditzz with Claude AI');
+console.log('📦 Version: 2.0 with CORS handling');
