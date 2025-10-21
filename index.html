@@ -1,0 +1,91 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Polaroid Generator</title>
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+    <canvas id="constellation"></canvas>
+    
+    <div class="container">
+        <div class="hero">
+            <h1 class="logo">Polaroid Generator</h1>
+            <p class="tagline">Ubah gambar Anda menjadi polaroid yang menakjubkan</p>
+        </div>
+
+        <div class="upload-wrapper">
+            <div class="upload-box" id="uploadBox1">
+                <input type="file" id="file1" accept="image/*" hidden>
+                <div class="upload-content">
+                    <div class="upload-icon">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4M17 8l-5-5-5 5M12 3v12"/>
+                        </svg>
+                    </div>
+                    <h3>Letakkan gambar pertama di sini</h3>
+                    <p>atau klik untuk memilih file</p>
+                    <span class="file-support">Mendukung: JPG, PNG, WEBP</span>
+                </div>
+                <div class="preview" id="preview1"></div>
+                <div class="upload-progress" id="progress1">
+                    <div class="progress-fill"></div>
+                </div>
+            </div>
+
+            <div class="upload-box" id="uploadBox2">
+                <input type="file" id="file2" accept="image/*" hidden>
+                <div class="upload-content">
+                    <div class="upload-icon">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4M17 8l-5-5-5 5M12 3v12"/>
+                        </svg>
+                    </div>
+                    <h3>Letakkan gambar kedua di sini</h3>
+                    <p>atau klik untuk memilih file</p>
+                    <span class="file-support">Mendukung: JPG, PNG, WEBP</span>
+                </div>
+                <div class="preview" id="preview2"></div>
+                <div class="upload-progress" id="progress2">
+                    <div class="progress-fill"></div>
+                </div>
+            </div>
+        </div>
+
+        <button class="generate-btn" id="generateBtn" disabled>
+            <span>Generate</span>
+        </button>
+
+        <div class="result-section" id="resultSection">
+            <div class="loading" id="loading">
+                <div class="spinner"></div>
+                <p>Membuat polaroid Anda...</p>
+            </div>
+            <div class="result" id="result">
+                <img id="polaroidImg" alt="Polaroid Result">
+                <div class="result-actions">
+                    <button class="action-btn download" id="downloadBtn">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4M7 10l5 5 5-5M12 15V3"/>
+                        </svg>
+                        Download
+                    </button>
+                    <button class="action-btn reset" id="resetBtn">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <path d="M3 12a9 9 0 0 1 9-9 9.75 9.75 0 0 1 6.74 2.74L21 8M3 16l2.26 2.26A9.75 9.75 0 0 0 12 21a9 9 0 0 0 9-9"/>
+                        </svg>
+                        Buat Baru
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <footer class="footer">
+        <p>Created by <span class="highlight">Ditzz</span> with <span class="highlight">Claude AI</span></p>
+    </footer>
+
+    <script src="script.js"></script>
+</body>
+</html>
