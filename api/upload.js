@@ -1,4 +1,3 @@
-// ✅ Polaroid Generator - Edge Runtime (upload -> tmpfiles.org)
 export const config = {
   runtime: "edge",
 };
@@ -30,12 +29,12 @@ export default async function handler(req) {
       );
     }
 
-    // Upload ke tmpfiles.org
+    // === STEP 1: Upload ke tmpfiles.org ===
     const url1 = await uploadToTmpFiles(img1);
     const url2 = await uploadToTmpFiles(img2);
     if (!url1 || !url2) throw new Error("Upload ke tmpfiles.org gagal");
 
-    // Panggil API Polaroid
+    // === STEP 2: Panggil API Polaroid ===
     const apiUrl = `https://api.zenzxz.my.id/api/maker/polaroid?img1=${encodeURIComponent(
       url1
     )}&img2=${encodeURIComponent(url2)}`;
@@ -44,10 +43,7 @@ export default async function handler(req) {
     if (!result.ok) throw new Error("Gagal memproses API Polaroid");
 
     const arrayBuffer = await result.arrayBuffer();
-    // convert ArrayBuffer -> base64
-    const base64Image = btoa(
-      String.fromCharCode(...new Uint8Array(arrayBuffer))
-    );
+    const base64Image = arrayBufferToBase64(arrayBuffer);
     const dataUrl = `data:image/png;base64,${base64Image}`;
 
     return new Response(
@@ -56,22 +52,32 @@ export default async function handler(req) {
         result: dataUrl,
         urls: { img1: url1, img2: url2 },
       }),
-      { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      {
+        status: 200,
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      }
     );
   } catch (err) {
-    console.error("❌ Error:", err);
+    console.error("❌ Error:", err.message);
     return new Response(
-      JSON.stringify({ error: "Gagal membuat polaroid", message: err.message }),
-      { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      JSON.stringify({
+        error: "Internal Server Error",
+        message: err.message,
+      }),
+      {
+        status: 500,
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      }
     );
   }
 }
 
-// Helper: upload base64 image to tmpfiles.org using FormData + Blob
+// ==========================
+// 🔧 Helper: Upload ke tmpfiles.org
+// ==========================
 async function uploadToTmpFiles(base64Image) {
   try {
-    // bersihkan data URL prefix
-    const cleanBase64 = base64Image.replace(/^data:image\/\w+;base64,/, "");
+    const cleanBase64 = base64Image.replace(/^data:image\\/\\w+;base64,/, "");
     const binary = atob(cleanBase64);
     const len = binary.length;
     const bytes = new Uint8Array(len);
@@ -87,21 +93,33 @@ async function uploadToTmpFiles(base64Image) {
     });
 
     if (!uploadRes.ok) {
-      console.error("tmpfiles responded:", uploadRes.status, await uploadRes.text());
-      throw new Error("Upload ke tmpfiles gagal (network)");
+      const text = await uploadRes.text();
+      console.error("Upload error:", text.slice(0, 300)); // Hindari logging besar
+      throw new Error("Upload gagal: tmpfiles.org error");
     }
 
-    const data = await uploadRes.json();
-    // contoh respons: { status: "success", data: { url: "https://tmpfiles.org/abcd/filename.jpg", ... } }
+    const data = await uploadRes.json().catch(() => ({}));
     if (data.status === "success" && data.data?.url) {
-      // convert to direct dl link: tmpfiles.org/ -> tmpfiles.org/dl/
       return data.data.url.replace("tmpfiles.org/", "tmpfiles.org/dl/");
     }
-
-    console.error("tmpfiles returned unexpected:", data);
+    console.error("Unexpected tmpfiles.org response:", JSON.stringify(data));
     return null;
   } catch (e) {
-    console.error("Upload error:", e);
+    console.error("UploadToTmpFiles exception:", e.message);
     return null;
   }
-                }
+}
+
+// ==========================
+// 🔧 Helper: Convert ArrayBuffer → Base64
+// ==========================
+function arrayBufferToBase64(buffer) {
+  let binary = "";
+  const bytes = new Uint8Array(buffer);
+  const chunkSize = 8192; // Hindari stack overflow
+  for (let i = 0; i < bytes.length; i += chunkSize) {
+    const chunk = bytes.subarray(i, i + chunkSize);
+    binary += String.fromCharCode.apply(null, chunk);
+  }
+  return btoa(binary);
+      }
