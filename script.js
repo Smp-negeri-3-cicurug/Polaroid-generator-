@@ -149,7 +149,7 @@ const progressBars = {
 };
 
 let uploadedImages = { img1: null, img2: null };
-let generatedPolaroidData = null; // Store the base64 data
+let generatedPolaroidData = null;
 
 // Setup upload handlers
 Object.keys(uploadBoxes).forEach(key => {
@@ -260,8 +260,8 @@ document.getElementById('generateBtn').addEventListener('click', async () => {
     const polaroidImg = document.getElementById('polaroidImg');
     const resultSection = document.getElementById('resultSection');
 
-    // GANTI dengan URL Vercel Anda
-    const API_URL = 'https://your-backend.vercel.app/api/upload';
+    // ✅ FIXED: URL yang benar untuk Vercel deployment Anda
+    const API_URL = 'https://polaroid-generator-ditzz.vercel.app/api/upload';
 
     try {
         loading.classList.add('show');
@@ -270,9 +270,12 @@ document.getElementById('generateBtn').addEventListener('click', async () => {
 
         showNotification('Membuat polaroid...', 'info');
 
-        // Call backend API dengan timeout
+        console.log('🚀 Calling API:', API_URL);
+        console.log('📦 Image 1 size:', uploadedImages.img1.length, 'chars');
+        console.log('📦 Image 2 size:', uploadedImages.img2.length, 'chars');
+
         const controller = new AbortController();
-        const timeoutId = setTimeout(() => controller.abort(), 60000); // 60 second timeout
+        const timeoutId = setTimeout(() => controller.abort(), 90000); // 90 second timeout
 
         const response = await fetch(API_URL, {
             method: 'POST',
@@ -284,10 +287,14 @@ document.getElementById('generateBtn').addEventListener('click', async () => {
                 img1: uploadedImages.img1,
                 img2: uploadedImages.img2
             }),
-            signal: controller.signal
+            signal: controller.signal,
+            mode: 'cors'
         });
 
         clearTimeout(timeoutId);
+
+        console.log('✅ Response status:', response.status);
+        console.log('📋 Response headers:', Object.fromEntries([...response.headers.entries()]));
 
         if (!response.ok) {
             const errorData = await response.json().catch(() => ({}));
@@ -295,28 +302,26 @@ document.getElementById('generateBtn').addEventListener('click', async () => {
         }
 
         const data = await response.json();
+        console.log('📊 Response data:', { success: data.success, hasImage: !!data.image });
 
         if (!data.success || !data.image) {
             throw new Error('Invalid response from server');
         }
 
-        // Store the base64 data for download
         generatedPolaroidData = data.image;
-
-        // Display image dengan CORS-safe method
-        // Gunakan base64 data URL langsung
         polaroidImg.src = data.image;
         
         polaroidImg.onload = () => {
             loading.classList.remove('show');
             result.classList.add('show');
             
-            // Show download and reset buttons
-            document.querySelector('.result-actions').style.display = 'flex';
+            const actions = document.querySelector('.result-actions');
+            if (actions) {
+                actions.style.display = 'flex';
+            }
             
             showNotification('Polaroid berhasil dibuat! 🎉', 'success');
             
-            // Scroll to result smoothly
             setTimeout(() => {
                 result.scrollIntoView({ behavior: 'smooth', block: 'center' });
             }, 100);
@@ -328,7 +333,7 @@ document.getElementById('generateBtn').addEventListener('click', async () => {
         };
 
     } catch (error) {
-        console.error('Generate error:', error);
+        console.error('❌ Generate error:', error);
         loading.classList.remove('show');
         
         let errorMessage = 'Gagal membuat polaroid';
@@ -338,11 +343,11 @@ Error Message: ${error.message || 'Unknown error'}
 Timestamp: ${new Date().toISOString()}
 API URL: ${API_URL}
 
-Possible causes:
-- Network connection issue
-- Backend server is down
-- API rate limit exceeded
-- Invalid image format
+Troubleshooting:
+1. Pastikan backend sudah di-deploy di Vercel
+2. Cek https://polaroid-generator-ditzz.vercel.app/api/upload
+3. Harus return error "Method not allowed" (bukan 404)
+4. Pastikan file api/upload.js ada di folder api/
 
 Stack Trace:
 ${error.stack || 'No stack trace available'}
@@ -350,7 +355,7 @@ ${error.stack || 'No stack trace available'}
 
         if (error.name === 'AbortError') {
             errorMessage = 'Request timeout';
-            errorDetails = 'The request took too long to complete. Please try again with smaller images.';
+            errorDetails = 'The request took too long to complete. Please try again with smaller images or check your internet connection.';
         }
         
         showErrorModal(new Error(errorMessage), errorDetails);
@@ -358,7 +363,7 @@ ${error.stack || 'No stack trace available'}
     }
 });
 
-// Download dengan CORS-safe method
+// Download
 document.getElementById('downloadBtn').addEventListener('click', async () => {
     try {
         if (!generatedPolaroidData) {
@@ -366,12 +371,10 @@ document.getElementById('downloadBtn').addEventListener('click', async () => {
             return;
         }
 
-        // Method 1: Direct download dari base64 data
         const link = document.createElement('a');
         link.href = generatedPolaroidData;
         link.download = `polaroid-${Date.now()}.png`;
         
-        // Trigger download
         document.body.appendChild(link);
         link.click();
         document.body.removeChild(link);
@@ -381,7 +384,6 @@ document.getElementById('downloadBtn').addEventListener('click', async () => {
     } catch (error) {
         console.error('Download error:', error);
         
-        // Fallback: Open in new tab
         try {
             const newWindow = window.open();
             newWindow.document.write(`
@@ -399,37 +401,32 @@ document.getElementById('downloadBtn').addEventListener('click', async () => {
     }
 });
 
-// Reset - Clear everything
+// Reset
 document.getElementById('resetBtn').addEventListener('click', () => {
-    // Clear file inputs
     fileInputs[1].value = '';
     fileInputs[2].value = '';
     
-    // Remove file states
     uploadBoxes[1].classList.remove('has-file');
     uploadBoxes[2].classList.remove('has-file');
     
-    // Clear previews
     previews[1].classList.remove('show');
     previews[2].classList.remove('show');
     previews[1].innerHTML = '';
     previews[2].innerHTML = '';
     
-    // Reset data
     uploadedImages = { img1: null, img2: null };
     generatedPolaroidData = null;
     
-    // Hide result
     document.getElementById('result').classList.remove('show');
     document.getElementById('loading').classList.remove('show');
     
-    // Hide buttons
-    document.querySelector('.result-actions').style.display = 'none';
+    const actions = document.querySelector('.result-actions');
+    if (actions) {
+        actions.style.display = 'none';
+    }
     
-    // Reset button
     checkGenerateButton();
     
-    // Scroll to top
     window.scrollTo({ top: 0, behavior: 'smooth' });
     
     showNotification('Siap untuk polaroid baru! ✨', 'success');
@@ -495,4 +492,5 @@ function showErrorModal(error, details = null) {
 
 console.log('🌟 Polaroid Generator Ready!');
 console.log('✨ Created by Ditzz with Claude AI');
-console.log('📦 Version: 2.0 with CORS handling');
+console.log('📦 Version: 2.1 - Fixed API URL');
+console.log('🔗 API Endpoint:', 'https://polaroid-generator-ditzz.vercel.app/api/upload');
