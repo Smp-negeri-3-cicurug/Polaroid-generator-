@@ -1,496 +1,487 @@
-// Constellation Canvas - Enhanced & Smooth like bratku
+// ============================================
+// CONSTELLATION CANVAS ANIMATION
+// ============================================
+
 const canvas = document.getElementById('constellation');
 const ctx = canvas.getContext('2d');
 
+const config = {
+  connectionDistance: 150,
+  mouseRadius: 200,
+  particleDensity: 9000
+};
+
 let particles = [];
 let mouse = { x: null, y: null };
-const connectionDistance = 150;
-const mouseRadius = 200;
 
-function resizeCanvas() {
-    canvas.width = window.innerWidth;
-    canvas.height = window.innerHeight;
-    initParticles();
+// Particle Class
+class Particle {
+  constructor() {
+    this.x = Math.random() * canvas.width;
+    this.y = Math.random() * canvas.height;
+    this.size = Math.random() * 2 + 1;
+    this.density = Math.random() * 30 + 1;
+    this.vx = (Math.random() - 0.5) * 0.3;
+    this.vy = (Math.random() - 0.5) * 0.3;
+    this.opacity = Math.random() * 0.5 + 0.5;
+    this.fadeSpeed = Math.random() * 0.01 + 0.005;
+    this.fadeDirection = Math.random() > 0.5 ? 1 : -1;
+  }
+
+  update() {
+    // Move particle
+    this.x += this.vx;
+    this.y += this.vy;
+
+    // Wrap around screen edges
+    if (this.x < -10) this.x = canvas.width + 10;
+    if (this.x > canvas.width + 10) this.x = -10;
+    if (this.y < -10) this.y = canvas.height + 10;
+    if (this.y > canvas.height + 10) this.y = -10;
+
+    // Mouse interaction
+    if (mouse.x !== null && mouse.y !== null) {
+      const dx = mouse.x - this.x;
+      const dy = mouse.y - this.y;
+      const distance = Math.sqrt(dx * dx + dy * dy);
+
+      if (distance < config.mouseRadius) {
+        const force = (config.mouseRadius - distance) / config.mouseRadius;
+        const forceX = (dx / distance) * force * this.density * 0.2;
+        const forceY = (dy / distance) * force * this.density * 0.2;
+        this.x -= forceX;
+        this.y -= forceY;
+      }
+    }
+
+    // Fade animation
+    this.opacity += this.fadeSpeed * this.fadeDirection;
+    if (this.opacity >= 1 || this.opacity <= 0.3) {
+      this.fadeDirection *= -1;
+    }
+  }
+
+  draw() {
+    ctx.save();
+    ctx.globalAlpha = this.opacity;
+    ctx.fillStyle = '#5e81f4';
+    ctx.beginPath();
+    ctx.arc(this.x, this.y, this.size, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.restore();
+  }
 }
 
-class Particle {
-    constructor() {
-        this.x = Math.random() * canvas.width;
-        this.y = Math.random() * canvas.height;
-        this.size = Math.random() * 2 + 1;
-        this.baseX = this.x;
-        this.baseY = this.y;
-        this.density = (Math.random() * 30) + 1;
-        this.vx = (Math.random() - 0.5) * 0.3;
-        this.vy = (Math.random() - 0.5) * 0.3;
-        this.opacity = Math.random() * 0.5 + 0.5;
-        this.fadeSpeed = (Math.random() * 0.01) + 0.005;
-        this.fadeDirection = Math.random() > 0.5 ? 1 : -1;
-    }
-
-    update() {
-        this.x += this.vx;
-        this.y += this.vy;
-
-        if (this.x < -10) this.x = canvas.width + 10;
-        if (this.x > canvas.width + 10) this.x = -10;
-        if (this.y < -10) this.y = canvas.height + 10;
-        if (this.y > canvas.height + 10) this.y = -10;
-
-        if (mouse.x !== null && mouse.y !== null) {
-            const dx = mouse.x - this.x;
-            const dy = mouse.y - this.y;
-            const distance = Math.sqrt(dx * dx + dy * dy);
-            const forceDirectionX = dx / distance;
-            const forceDirectionY = dy / distance;
-            const maxDistance = mouseRadius;
-            const force = (maxDistance - distance) / maxDistance;
-            
-            if (distance < mouseRadius) {
-                const directionX = forceDirectionX * force * this.density * 0.2;
-                const directionY = forceDirectionY * force * this.density * 0.2;
-                this.x -= directionX;
-                this.y -= directionY;
-            }
-        }
-
-        this.opacity += this.fadeSpeed * this.fadeDirection;
-        if (this.opacity >= 1 || this.opacity <= 0.3) {
-            this.fadeDirection *= -1;
-        }
-    }
-
-    draw() {
-        ctx.save();
-        ctx.globalAlpha = this.opacity;
-        ctx.fillStyle = '#5e81f4';
-        ctx.beginPath();
-        ctx.arc(this.x, this.y, this.size, 0, Math.PI * 2);
-        ctx.fill();
-        ctx.restore();
-    }
+// Canvas Functions
+function resizeCanvas() {
+  canvas.width = window.innerWidth;
+  canvas.height = window.innerHeight;
+  initParticles();
 }
 
 function initParticles() {
-    particles = [];
-    const numberOfParticles = Math.floor((canvas.width * canvas.height) / 9000);
-    for (let i = 0; i < numberOfParticles; i++) {
-        particles.push(new Particle());
-    }
+  particles = [];
+  const count = Math.floor((canvas.width * canvas.height) / config.particleDensity);
+  for (let i = 0; i < count; i++) {
+    particles.push(new Particle());
+  }
 }
 
 function connectParticles() {
-    for (let i = 0; i < particles.length; i++) {
-        for (let j = i + 1; j < particles.length; j++) {
-            const dx = particles[i].x - particles[j].x;
-            const dy = particles[i].y - particles[j].y;
-            const distance = Math.sqrt(dx * dx + dy * dy);
+  for (let i = 0; i < particles.length; i++) {
+    for (let j = i + 1; j < particles.length; j++) {
+      const dx = particles[i].x - particles[j].x;
+      const dy = particles[i].y - particles[j].y;
+      const distance = Math.sqrt(dx * dx + dy * dy);
 
-            if (distance < connectionDistance) {
-                const opacity = (1 - distance / connectionDistance) * 0.3;
-                ctx.save();
-                ctx.globalAlpha = opacity * particles[i].opacity * particles[j].opacity;
-                ctx.strokeStyle = '#5e81f4';
-                ctx.lineWidth = 0.8;
-                ctx.beginPath();
-                ctx.moveTo(particles[i].x, particles[i].y);
-                ctx.lineTo(particles[j].x, particles[j].y);
-                ctx.stroke();
-                ctx.restore();
-            }
-        }
+      if (distance < config.connectionDistance) {
+        const lineOpacity = (1 - distance / config.connectionDistance) * 0.3;
+        ctx.save();
+        ctx.globalAlpha = lineOpacity * particles[i].opacity * particles[j].opacity;
+        ctx.strokeStyle = '#5e81f4';
+        ctx.lineWidth = 0.8;
+        ctx.beginPath();
+        ctx.moveTo(particles[i].x, particles[i].y);
+        ctx.lineTo(particles[j].x, particles[j].y);
+        ctx.stroke();
+        ctx.restore();
+      }
     }
+  }
 }
 
 function animate() {
-    ctx.clearRect(0, 0, canvas.width, canvas.height);
-    
-    particles.forEach(particle => {
-        particle.update();
-        particle.draw();
-    });
-    
-    connectParticles();
-    requestAnimationFrame(animate);
+  ctx.clearRect(0, 0, canvas.width, canvas.height);
+  
+  particles.forEach(particle => {
+    particle.update();
+    particle.draw();
+  });
+  
+  connectParticles();
+  requestAnimationFrame(animate);
 }
 
+// Event Listeners for Canvas
+window.addEventListener('resize', resizeCanvas);
+window.addEventListener('mousemove', (e) => {
+  mouse.x = e.clientX;
+  mouse.y = e.clientY;
+});
+window.addEventListener('mouseleave', () => {
+  mouse.x = null;
+  mouse.y = null;
+});
+
+// Initialize Canvas
 resizeCanvas();
 animate();
 
-window.addEventListener('resize', resizeCanvas);
-window.addEventListener('mousemove', (e) => {
-    mouse.x = e.clientX;
-    mouse.y = e.clientY;
-});
-window.addEventListener('mouseleave', () => {
-    mouse.x = null;
-    mouse.y = null;
-});
 
-// Upload & Generate Logic
-const uploadBoxes = {
-    1: document.getElementById('uploadBox1'), 
-    2: document.getElementById('uploadBox2')  
+// ============================================
+// POLAROID GENERATOR APP
+// ============================================
+
+const API_ENDPOINT = '/api/upload';
+
+// App State
+const appState = {
+  selectedFiles: {
+    file1: null,
+    file2: null
+  }
 };
 
-const fileInputs = {
+// DOM Elements
+const elements = {
+  uploadBoxes: {},
+  fileInputs: {},
+  previews: {},
+  generateBtn: null,
+  loading: null,
+  result: null,
+  resultSection: null,
+  polaroidImg: null,
+  downloadBtn: null,
+  resetBtn: null,
+  footer: null
+};
+
+// Initialize App
+document.addEventListener('DOMContentLoaded', function() {
+  initElements();
+  setupEventListeners();
+});
+
+function initElements() {
+  elements.uploadBoxes = {
+    1: document.getElementById('uploadBox1'),
+    2: document.getElementById('uploadBox2')
+  };
+  
+  elements.fileInputs = {
     1: document.getElementById('file1'),
     2: document.getElementById('file2')
-};
-
-const previews = {
+  };
+  
+  elements.previews = {
     1: document.getElementById('preview1'),
     2: document.getElementById('preview2')
-};
+  };
+  
+  elements.generateBtn = document.getElementById('generateBtn');
+  elements.loading = document.getElementById('loading');
+  elements.result = document.getElementById('result');
+  elements.resultSection = document.getElementById('resultSection');
+  elements.polaroidImg = document.getElementById('polaroidImg');
+  elements.downloadBtn = document.getElementById('downloadBtn');
+  elements.resetBtn = document.getElementById('resetBtn');
+  elements.footer = document.querySelector('.footer');
+}
 
-const progressBars = {
-    1: document.getElementById('progress1'),
-    2: document.getElementById('progress2')
-};
+function setupEventListeners() {
+  // Upload handlers
+  Object.keys(elements.uploadBoxes).forEach(key => {
+    setupUploadBox(key);
+  });
+  
+  // Action buttons
+  elements.generateBtn.addEventListener('click', generatePolaroid);
+  elements.downloadBtn.addEventListener('click', downloadResult);
+  elements.resetBtn.addEventListener('click', resetApp);
+}
 
-let uploadedImages = { img1: null, img2: null };
-let generatedPolaroidData = null;
-
-// Setup upload handlers
-Object.keys(uploadBoxes).forEach(key => {
-    const box = uploadBoxes[key];
-    const input = fileInputs[key];
+function setupUploadBox(key) {
+  const box = elements.uploadBoxes[key];
+  const input = elements.fileInputs[key];
+  const preview = elements.previews[key];
+  
+  // Click to upload
+  box.addEventListener('click', () => input.click());
+  
+  // File input change
+  input.addEventListener('change', (e) => {
+    const file = e.target.files[0];
+    if (file) handleFile(file, key, box, preview);
+  });
+  
+  // Drag over
+  box.addEventListener('dragover', (e) => {
+    e.preventDefault();
+    box.style.borderColor = 'rgba(123, 104, 238, 0.8)';
+    box.style.background = 'rgba(123, 104, 238, 0.15)';
+  });
+  
+  // Drag leave
+  box.addEventListener('dragleave', () => {
+    box.style.borderColor = '';
+    box.style.background = '';
+  });
+  
+  // Drop
+  box.addEventListener('drop', (e) => {
+    e.preventDefault();
+    box.style.borderColor = '';
+    box.style.background = '';
     
-    box.addEventListener('click', () => input.click());
-    
-    box.addEventListener('dragover', (e) => {
-        e.preventDefault();
-        box.style.borderColor = 'rgba(123, 104, 238, 0.8)';
-        box.style.background = 'rgba(123, 104, 238, 0.15)';
-    });
-    
-    box.addEventListener('dragleave', () => {
-        box.style.borderColor = '';
-        box.style.background = '';
-    });
-    
-    box.addEventListener('drop', (e) => {
-        e.preventDefault();
-        box.style.borderColor = '';
-        box.style.background = '';
-        
-        const file = e.dataTransfer.files[0];
-        if (file) {
-            const dataTransfer = new DataTransfer();
-            dataTransfer.items.add(file);
-            input.files = dataTransfer.files;
-            handleFileSelect({ target: input }, key);
-        }
-    });
-    
-    input.addEventListener('change', (e) => handleFileSelect(e, key));
-});
+    const file = e.dataTransfer.files[0];
+    if (file) handleFile(file, key, box, preview);
+  });
+}
 
-function handleFileSelect(event, boxNumber) {
-    const file = event.target.files[0];
-    if (!file) return;
-
-    if (!file.type.startsWith('image/')) {
-        showErrorModal(
-            new Error('File tidak valid'),
-            `File Type: ${file.type}\nFile Name: ${file.name}\nExpected: image/jpeg, image/png, image/webp`
-        );
-        return;
-    }
-
-    if (file.size > 10 * 1024 * 1024) {
-        showErrorModal(
-            new Error('Ukuran file terlalu besar'),
-            `File Size: ${(file.size / 1024 / 1024).toFixed(2)} MB\nMax Size: 10 MB\nFile Name: ${file.name}`
-        );
-        return;
-    }
-
-    const progress = progressBars[boxNumber];
-    const progressBar = progress.querySelector('.progress-fill');
-    progress.classList.add('show');
-    progressBar.style.width = '30%';
-
-    const reader = new FileReader();
-    reader.onload = (e) => {
-        progressBar.style.width = '70%';
-        
-        const preview = previews[boxNumber];
-        preview.innerHTML = `<img src="${e.target.result}" alt="Preview">`;
-        preview.classList.add('show');
-        uploadBoxes[boxNumber].classList.add('has-file');
-        
-        uploadedImages[`img${boxNumber}`] = e.target.result;
-        
-        progressBar.style.width = '100%';
-        
-        setTimeout(() => {
-            progress.classList.remove('show');
-            progressBar.style.width = '0%';
-        }, 500);
-
-        showNotification('Gambar berhasil diupload!', 'success');
-        checkGenerateButton();
-    };
+// File Handling
+function handleFile(file, number, box, preview) {
+  // Validate file type
+  if (!file.type.startsWith('image/')) {
+    showNotification('Mohon pilih file gambar', 'error');
+    return;
+  }
+  
+  // Validate file size (10MB)
+  if (file.size > 10 * 1024 * 1024) {
+    showNotification('Ukuran file harus kurang dari 10MB', 'error');
+    return;
+  }
+  
+  // Store file
+  appState.selectedFiles[`file${number}`] = file;
+  
+  // Show preview
+  const reader = new FileReader();
+  reader.onload = function(e) {
+    preview.innerHTML = `<img src="${e.target.result}" alt="Preview ${number}">`;
+    preview.classList.add('show');
+    box.classList.add('has-file');
     
-    reader.onerror = () => {
-        progressBar.style.width = '0%';
-        progress.classList.remove('show');
-        
-        showErrorModal(
-            new Error('Gagal membaca file'),
-            `File Name: ${file.name}\nFile Size: ${(file.size / 1024).toFixed(2)} KB\nError: FileReader error`
-        );
-    };
-    
-    reader.readAsDataURL(file);
+    checkGenerateButton();
+    showNotification(`Gambar ${number} berhasil diupload`, 'success');
+  };
+  reader.readAsDataURL(file);
 }
 
 function checkGenerateButton() {
-    const btn = document.getElementById('generateBtn');
-    btn.disabled = !(uploadedImages.img1 && uploadedImages.img2);
+  const hasAllFiles = appState.selectedFiles.file1 && appState.selectedFiles.file2;
+  elements.generateBtn.disabled = !hasAllFiles;
 }
 
-// Generate Polaroid with Backend API
-document.getElementById('generateBtn').addEventListener('click', async () => {
-    if (!uploadedImages.img1 || !uploadedImages.img2) return;
-
-    const loading = document.getElementById('loading');
-    const result = document.getElementById('result');
-    const polaroidImg = document.getElementById('polaroidImg');
-    const resultSection = document.getElementById('resultSection');
-
-    // ✅ FIXED: URL yang benar untuk Vercel deployment Anda
-    const API_URL = 'https://polaroid-generator-ditzz.vercel.app/api/upload';
-
-    try {
-        loading.classList.add('show');
-        result.classList.remove('show');
-        resultSection.scrollIntoView({ behavior: 'smooth', block: 'center' });
-
-        showNotification('Membuat polaroid...', 'info');
-
-        console.log('🚀 Calling API:', API_URL);
-        console.log('📦 Image 1 size:', uploadedImages.img1.length, 'chars');
-        console.log('📦 Image 2 size:', uploadedImages.img2.length, 'chars');
-
-        const controller = new AbortController();
-        const timeoutId = setTimeout(() => controller.abort(), 90000); // 90 second timeout
-
-        const response = await fetch(API_URL, {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/json',
-                'Accept': 'application/json'
-            },
-            body: JSON.stringify({
-                img1: uploadedImages.img1,
-                img2: uploadedImages.img2
-            }),
-            signal: controller.signal,
-            mode: 'cors'
-        });
-
-        clearTimeout(timeoutId);
-
-        console.log('✅ Response status:', response.status);
-        console.log('📋 Response headers:', Object.fromEntries([...response.headers.entries()]));
-
-        if (!response.ok) {
-            const errorData = await response.json().catch(() => ({}));
-            throw new Error(errorData.message || `HTTP error! status: ${response.status}`);
-        }
-
-        const data = await response.json();
-        console.log('📊 Response data:', { success: data.success, hasImage: !!data.image });
-
-        if (!data.success || !data.image) {
-            throw new Error('Invalid response from server');
-        }
-
-        generatedPolaroidData = data.image;
-        polaroidImg.src = data.image;
-        
-        polaroidImg.onload = () => {
-            loading.classList.remove('show');
-            result.classList.add('show');
-            
-            const actions = document.querySelector('.result-actions');
-            if (actions) {
-                actions.style.display = 'flex';
-            }
-            
-            showNotification('Polaroid berhasil dibuat! 🎉', 'success');
-            
-            setTimeout(() => {
-                result.scrollIntoView({ behavior: 'smooth', block: 'center' });
-            }, 100);
-        };
-
-        polaroidImg.onerror = () => {
-            loading.classList.remove('show');
-            throw new Error('Failed to load generated image');
-        };
-
-    } catch (error) {
-        console.error('❌ Generate error:', error);
-        loading.classList.remove('show');
-        
-        let errorMessage = 'Gagal membuat polaroid';
-        let errorDetails = `
-Error Type: ${error.name || 'Unknown'}
-Error Message: ${error.message || 'Unknown error'}
-Timestamp: ${new Date().toISOString()}
-API URL: ${API_URL}
-
-Troubleshooting:
-1. Pastikan backend sudah di-deploy di Vercel
-2. Cek https://polaroid-generator-ditzz.vercel.app/api/upload
-3. Harus return error "Method not allowed" (bukan 404)
-4. Pastikan file api/upload.js ada di folder api/
-
-Stack Trace:
-${error.stack || 'No stack trace available'}
-        `.trim();
-
-        if (error.name === 'AbortError') {
-            errorMessage = 'Request timeout';
-            errorDetails = 'The request took too long to complete. Please try again with smaller images or check your internet connection.';
-        }
-        
-        showErrorModal(new Error(errorMessage), errorDetails);
-        showNotification(errorMessage, 'error');
-    }
-});
-
-// Download
-document.getElementById('downloadBtn').addEventListener('click', async () => {
-    try {
-        if (!generatedPolaroidData) {
-            showNotification('Tidak ada gambar untuk diunduh', 'error');
-            return;
-        }
-
-        const link = document.createElement('a');
-        link.href = generatedPolaroidData;
-        link.download = `polaroid-${Date.now()}.png`;
-        
-        document.body.appendChild(link);
-        link.click();
-        document.body.removeChild(link);
-        
-        showNotification('Download berhasil! 📥', 'success');
-
-    } catch (error) {
-        console.error('Download error:', error);
-        
-        try {
-            const newWindow = window.open();
-            newWindow.document.write(`
-                <html>
-                    <head><title>Polaroid Result</title></head>
-                    <body style="margin:0;display:flex;justify-content:center;align-items:center;min-height:100vh;background:#000;">
-                        <img src="${generatedPolaroidData}" style="max-width:100%;height:auto;">
-                    </body>
-                </html>
-            `);
-            showNotification('Gambar dibuka di tab baru. Klik kanan > Save Image', 'info');
-        } catch (fallbackError) {
-            showNotification('Gagal mendownload. Coba klik kanan pada gambar > Save Image', 'error');
-        }
-    }
-});
-
-// Reset
-document.getElementById('resetBtn').addEventListener('click', () => {
-    fileInputs[1].value = '';
-    fileInputs[2].value = '';
+// Generate Polaroid
+async function generatePolaroid() {
+  if (!appState.selectedFiles.file1 || !appState.selectedFiles.file2) {
+    showNotification('Upload kedua gambar terlebih dahulu', 'error');
+    return;
+  }
+  
+  try {
+    // Show loading state
+    elements.loading.classList.add('show');
+    elements.result.classList.remove('show');
+    elements.generateBtn.disabled = true;
+    elements.resultSection.scrollIntoView({ behavior: 'smooth', block: 'center' });
     
-    uploadBoxes[1].classList.remove('has-file');
-    uploadBoxes[2].classList.remove('has-file');
+    showNotification('Membuat polaroid...', 'info');
     
-    previews[1].classList.remove('show');
-    previews[2].classList.remove('show');
-    previews[1].innerHTML = '';
-    previews[2].innerHTML = '';
+    // Convert files to base64
+    const base64_1 = await toBase64(appState.selectedFiles.file1);
+    const base64_2 = await toBase64(appState.selectedFiles.file2);
     
-    uploadedImages = { img1: null, img2: null };
-    generatedPolaroidData = null;
+    // Call API
+    const response = await fetch(API_ENDPOINT, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ img1: base64_1, img2: base64_2 })
+    });
     
-    document.getElementById('result').classList.remove('show');
-    document.getElementById('loading').classList.remove('show');
-    
-    const actions = document.querySelector('.result-actions');
-    if (actions) {
-        actions.style.display = 'none';
+    // Handle API errors
+    if (!response.ok) {
+      let errMsg = 'Gagal membuat polaroid';
+      try {
+        const err = await response.json();
+        errMsg = err.message || err.error || errMsg;
+      } catch(e) {}
+      throw new Error(errMsg);
     }
     
-    checkGenerateButton();
+    const data = await response.json();
     
-    window.scrollTo({ top: 0, behavior: 'smooth' });
+    if (!data.success || !data.result) {
+      throw new Error('Invalid response from server');
+    }
     
-    showNotification('Siap untuk polaroid baru! ✨', 'success');
-});
-
-// Notification System
-function showNotification(message, type = 'info') {
-    const existingNotifs = document.querySelectorAll('.notification');
-    existingNotifs.forEach(n => n.remove());
+    // Set result image
+    elements.polaroidImg.src = data.result;
+    elements.polaroidImg.dataset.originalUrl = data.result;
     
-    const notification = document.createElement('div');
-    notification.className = `notification ${type}`;
-    notification.textContent = message;
-    document.body.appendChild(notification);
-
-    setTimeout(() => {
-        notification.style.animation = 'slideInRight 0.3s ease reverse';
-        setTimeout(() => notification.remove(), 300);
-    }, 3000);
+    // Enable action buttons
+    elements.downloadBtn.disabled = false;
+    elements.resetBtn.disabled = false;
+    
+    // Handle image load
+    elements.polaroidImg.onload = function() {
+      elements.loading.classList.remove('show');
+      elements.result.classList.add('show');
+      
+      // Dynamic footer positioning - push footer down
+      if (elements.footer) {
+        elements.footer.style.marginTop = 'auto';
+      }
+      
+      showNotification('Polaroid berhasil dibuat! 🎉', 'success');
+      
+      setTimeout(() => {
+        elements.result.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      }, 300);
+    };
+    
+    elements.polaroidImg.onerror = function() {
+      throw new Error('Failed to load generated image');
+    };
+    
+  } catch (error) {
+    console.error('Error:', error);
+    elements.loading.classList.remove('show');
+    showNotification(error.message || 'Gagal membuat polaroid. Silakan coba lagi.', 'error');
+  } finally {
+    elements.generateBtn.disabled = false;
+  }
 }
 
-// Error Modal System
-function showErrorModal(error, details = null) {
-    const existingModal = document.querySelector('.error-modal');
-    if (existingModal) existingModal.remove();
+// Download Result
+function downloadResult() {
+  const originalUrl = elements.polaroidImg.dataset.originalUrl || elements.polaroidImg.src;
+  
+  if (!originalUrl) {
+    showNotification('Tidak ada gambar untuk didownload', 'error');
+    return;
+  }
+  
+  // Handle data URL
+  if (originalUrl.startsWith('data:')) {
+    downloadDataUrl(originalUrl);
+    return;
+  }
+  
+  // Handle remote URL
+  downloadRemoteUrl(originalUrl);
+}
 
-    const modal = document.createElement('div');
-    modal.className = 'error-modal';
-    
-    modal.innerHTML = `
-        <div class="error-content">
-            <div class="error-header">
-                <div class="error-icon">⚠️</div>
-                <h3>Error Terjadi</h3>
-            </div>
-            <div class="error-message">
-                ${error.message || 'Terjadi kesalahan yang tidak diketahui'}
-            </div>
-            ${details ? `
-                <div class="error-details">
-                    <pre>${details}</pre>
-                </div>
-            ` : ''}
-            <div class="error-actions">
-                <button class="error-btn secondary" onclick="this.closest('.error-modal').remove()">
-                    Tutup
-                </button>
-                <button class="error-btn primary" onclick="location.reload()">
-                    Refresh Halaman
-                </button>
-            </div>
-        </div>
-    `;
+function downloadDataUrl(dataUrl) {
+  const link = document.createElement('a');
+  link.href = dataUrl;
+  link.download = `polaroid_${Date.now()}.png`;
+  document.body.appendChild(link);
+  link.click();
+  document.body.removeChild(link);
+  showNotification('Download dimulai...', 'success');
+}
 
-    document.body.appendChild(modal);
-
-    modal.addEventListener('click', (e) => {
-        if (e.target === modal) {
-            modal.remove();
-        }
+function downloadRemoteUrl(url) {
+  fetch(url)
+    .then(resp => resp.blob())
+    .then(blob => {
+      const blobUrl = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = blobUrl;
+      a.download = `polaroid_${Date.now()}.png`;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(blobUrl);
+      showNotification('Download dimulai...', 'success');
+    })
+    .catch(err => {
+      console.warn('Fetch download failed, opening in new tab', err);
+      window.open(url, '_blank');
+      showNotification('Membuka gambar di tab baru...', 'info');
     });
 }
 
-console.log('🌟 Polaroid Generator Ready!');
-console.log('✨ Created by Ditzz with Claude AI');
-console.log('📦 Version: 2.1 - Fixed API URL');
-console.log('🔗 API Endpoint:', 'https://polaroid-generator-ditzz.vercel.app/api/upload');
+// Reset App
+function resetApp() {
+  // Clear state
+  appState.selectedFiles = {
+    file1: null,
+    file2: null
+  };
+  
+  // Clear inputs
+  elements.fileInputs[1].value = '';
+  elements.fileInputs[2].value = '';
+  
+  // Clear previews
+  elements.previews[1].classList.remove('show');
+  elements.previews[2].classList.remove('show');
+  elements.previews[1].innerHTML = '';
+  elements.previews[2].innerHTML = '';
+  
+  // Remove has-file class
+  elements.uploadBoxes[1].classList.remove('has-file');
+  elements.uploadBoxes[2].classList.remove('has-file');
+  
+  // Clear result
+  elements.polaroidImg.src = '';
+  elements.polaroidImg.dataset.originalUrl = '';
+  
+  // Reset UI state
+  elements.result.classList.remove('show');
+  elements.loading.classList.remove('show');
+  elements.downloadBtn.disabled = true;
+  elements.resetBtn.disabled = false;
+  elements.generateBtn.disabled = true;
+  
+  // Dynamic footer positioning - bring footer closer
+  if (elements.footer) {
+    elements.footer.style.marginTop = '40px';
+  }
+  
+  // Scroll to top
+  window.scrollTo({ top: 0, behavior: 'smooth' });
+  
+  showNotification('Siap membuat polaroid baru! ✨', 'success');
+}
+
+// Utility Functions
+function toBase64(file) {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => resolve(reader.result);
+    reader.onerror = reject;
+    reader.readAsDataURL(file);
+  });
+}
+
+function showNotification(message, type = 'info') {
+  // Remove existing notifications
+  document.querySelectorAll('.notification').forEach(n => n.remove());
+  
+  // Create notification
+  const notification = document.createElement('div');
+  notification.className = `notification ${type}`;
+  notification.textContent = message;
+  document.body.appendChild(notification);
+  
+  // Auto remove after 3 seconds
+  setTimeout(() => {
+    notification.style.animation = 'slideInRight 0.3s ease reverse';
+    setTimeout(() => notification.remove(), 300);
+  }, 3000);
+        }
