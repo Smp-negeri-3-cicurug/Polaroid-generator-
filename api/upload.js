@@ -1,4 +1,4 @@
-// api/upload.js - Vercel Serverless Function
+// api/upload.js - Vercel Serverless Function with postimg.cc
 import fetch from 'node-fetch';
 import FormData from 'form-data';
 
@@ -9,7 +9,6 @@ export default async function handler(req, res) {
   res.setHeader('Access-Control-Allow-Methods', 'GET,OPTIONS,POST');
   res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
 
-  // Handle preflight
   if (req.method === 'OPTIONS') {
     res.status(200).end();
     return;
@@ -26,7 +25,6 @@ export default async function handler(req, res) {
   try {
     const { img1, img2 } = req.body;
 
-    // Validate inputs
     if (!img1 || !img2) {
       return res.status(400).json({ 
         success: false,
@@ -37,21 +35,21 @@ export default async function handler(req, res) {
 
     console.log('Starting image upload process...');
 
-    // Step 1: Upload img1 to tmpfiles.org
-    console.log('Uploading image 1 to tmpfiles.org...');
-    const url1 = await uploadToTmpFiles(img1);
+    // Step 1: Upload img1 to postimg
+    console.log('Uploading image 1 to postimg.cc...');
+    const url1 = await uploadToPostimg(img1);
     
     if (!url1) {
-      throw new Error('Failed to upload image 1 to tmpfiles.org');
+      throw new Error('Failed to upload image 1 to postimg');
     }
     console.log('Image 1 uploaded:', url1);
 
-    // Step 2: Upload img2 to tmpfiles.org
-    console.log('Uploading image 2 to tmpfiles.org...');
-    const url2 = await uploadToTmpFiles(img2);
+    // Step 2: Upload img2 to postimg
+    console.log('Uploading image 2 to postimg.cc...');
+    const url2 = await uploadToPostimg(img2);
     
     if (!url2) {
-      throw new Error('Failed to upload image 2 to tmpfiles.org');
+      throw new Error('Failed to upload image 2 to postimg');
     }
     console.log('Image 2 uploaded:', url2);
 
@@ -61,7 +59,6 @@ export default async function handler(req, res) {
     
     console.log('Polaroid API URL:', polaroidApiUrl);
 
-    // Fetch polaroid with timeout
     const controller = new AbortController();
     const timeout = setTimeout(() => controller.abort(), 30000); // 30 second timeout
 
@@ -78,11 +75,9 @@ export default async function handler(req, res) {
       throw new Error(`Polaroid API returned status: ${polaroidResponse.status}`);
     }
 
-    // Check content type
     const contentType = polaroidResponse.headers.get('content-type');
     console.log('Response content-type:', contentType);
 
-    // Get image buffer
     const imageBuffer = await polaroidResponse.buffer();
     
     if (!imageBuffer || imageBuffer.length === 0) {
@@ -97,7 +92,6 @@ export default async function handler(req, res) {
 
     console.log('Successfully generated polaroid');
 
-    // Return success response
     return res.status(200).json({
       success: true,
       image: dataUrl,
@@ -112,7 +106,6 @@ export default async function handler(req, res) {
   } catch (error) {
     console.error('Error in handler:', error);
     
-    // Handle different error types
     let statusCode = 500;
     let errorMessage = error.message;
 
@@ -130,8 +123,8 @@ export default async function handler(req, res) {
   }
 }
 
-// Helper function to upload base64 image to tmpfiles.org
-async function uploadToTmpFiles(base64Image) {
+// Helper function to upload base64 image to postimg.cc
+async function uploadToPostimg(base64Image) {
   try {
     // Remove data URL prefix if exists
     const base64Data = base64Image.replace(/^data:image\/\w+;base64,/, '');
@@ -141,53 +134,86 @@ async function uploadToTmpFiles(base64Image) {
     
     console.log('Image buffer size:', buffer.length, 'bytes');
 
-    // Create form data
+    // Create form data for postimg.cc
     const form = new FormData();
-    form.append('file', buffer, {
-      filename: `polaroid-${Date.now()}-${Math.random().toString(36).substr(2, 9)}.jpg`,
+    form.append('upload', buffer, {
+      filename: `polaroid-${Date.now()}.jpg`,
       contentType: 'image/jpeg'
     });
+    form.append('type', 'file');
 
-    // Upload to tmpfiles.org with timeout
+    // Upload to postimg.cc
     const controller = new AbortController();
-    const timeout = setTimeout(() => controller.abort(), 20000); // 20 second timeout
+    const timeout = setTimeout(() => controller.abort(), 20000);
 
-    const response = await fetch('https://tmpfiles.org/api/v1/upload', {
+    const response = await fetch('https://postimg.cc/json', {
       method: 'POST',
       body: form,
-      headers: form.getHeaders(),
+      headers: {
+        ...form.getHeaders()
+      },
       signal: controller.signal
     });
 
     clearTimeout(timeout);
 
     if (!response.ok) {
-      console.error(`tmpfiles.org upload failed: ${response.status} ${response.statusText}`);
+      console.error(`postimg.cc upload failed: ${response.status}`);
       throw new Error(`Upload failed with status: ${response.status}`);
     }
 
-    const data = await response.json();
-    console.log('tmpfiles.org response:', JSON.stringify(data));
+    const text = await response.text();
+    console.log('postimg.cc raw response:', text);
     
-    // Check response format
-    if (data.status === 'success' && data.data && data.data.url) {
-      // Convert to direct download URL
-      // From: https://tmpfiles.org/12345/image.jpg
-      // To: https://tmpfiles.org/dl/12345/image.jpg
-      const directUrl = data.data.url.replace('tmpfiles.org/', 'tmpfiles.org/dl/');
-      console.log('Direct download URL:', directUrl);
+    // Try to parse as JSON first
+    try {
+      const data = JSON.parse(text);
+      
+      // Extract direct image URL from various possible response formats
+      // Format: https://i.postimg.cc/xdzsD01X/filename.jpg
+      if (data.url) {
+        console.log('Direct image URL:', data.url);
+        return data.url;
+      }
+      
+      if (data.image && data.image.url) {
+        console.log('Direct image URL:', data.image.url);
+        return data.image.url;
+      }
+      
+      if (data.src) {
+        console.log('Direct image URL:', data.src);
+        return data.src;
+      }
+    } catch (e) {
+      // Not JSON, try to extract URL from HTML
+      console.log('Response is not JSON, extracting from HTML...');
+    }
+    
+    // Extract URL from HTML response
+    // Look for pattern: https://i.postimg.cc/xdzsD01X/filename.jpg
+    const urlMatch = text.match(/https?:\/\/i\.postimg\.cc\/[A-Za-z0-9]+\/[^"'\s<>]+\.(jpg|jpeg|png|gif|webp)/i);
+    
+    if (urlMatch && urlMatch[0]) {
+      const directUrl = urlMatch[0];
+      console.log('Extracted direct image URL:', directUrl);
       return directUrl;
     }
 
-    console.error('Invalid tmpfiles.org response:', data);
-    throw new Error('Invalid response from tmpfiles.org');
+    console.error('Could not extract URL from postimg.cc response');
+    throw new Error('Failed to extract image URL');
 
   } catch (error) {
     if (error.name === 'AbortError') {
-      console.error('tmpfiles.org upload timeout');
+      console.error('postimg.cc upload timeout');
       throw new Error('Upload timeout');
     }
-    console.error('tmpfiles.org upload error:', error.message);
+    console.error('postimg.cc upload error:', error.message);
     throw error;
   }
-      }
+}
+
+// Fallback: Not needed anymore, removed
+async function uploadToPostimagesOrg(base64Image) {
+  throw new Error('Fallback not implemented');
+  }
