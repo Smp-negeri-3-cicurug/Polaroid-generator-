@@ -80,7 +80,8 @@ export default async function handler(req) {
 // ==========================
 async function uploadToPostImages(base64Image) {
   try {
-    const cleanBase64 = base64Image.replace(/^data:image\\/\\w+;base64,/, "");
+    // ✅ Perbaikan regex — HAPUS double backslash
+    const cleanBase64 = base64Image.replace(/^data:image\/\w+;base64,/, "");
     const byteCharacters = atob(cleanBase64);
     const byteNumbers = new Array(byteCharacters.length);
     for (let i = 0; i < byteCharacters.length; i++) {
@@ -105,4 +106,4 @@ async function uploadToPostImages(base64Image) {
     console.error("Upload error:", err);
     return null;
   }
-      }
+}
