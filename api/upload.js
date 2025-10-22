@@ -1,3 +1,4 @@
+// ✅ Polaroid Generator - Edge Runtime (upload → tmpfiles.org)
 export const config = {
   runtime: "edge",
 };
@@ -77,7 +78,8 @@ export default async function handler(req) {
 // ==========================
 async function uploadToTmpFiles(base64Image) {
   try {
-    const cleanBase64 = base64Image.replace(/^data:image\\/\\w+;base64,/, "");
+    // ✅ Perbaikan regex — tanpa backslash ganda
+    const cleanBase64 = base64Image.replace(/^data:image\/\w+;base64,/, "");
     const binary = atob(cleanBase64);
     const len = binary.length;
     const bytes = new Uint8Array(len);
@@ -94,12 +96,13 @@ async function uploadToTmpFiles(base64Image) {
 
     if (!uploadRes.ok) {
       const text = await uploadRes.text();
-      console.error("Upload error:", text.slice(0, 300)); // Hindari logging besar
-      throw new Error("Upload gagal: tmpfiles.org error");
+      console.error("Upload error:", text.slice(0, 300));
+      throw new Error("Upload ke tmpfiles gagal (network)");
     }
 
     const data = await uploadRes.json().catch(() => ({}));
     if (data.status === "success" && data.data?.url) {
+      // ubah ke direct download link
       return data.data.url.replace("tmpfiles.org/", "tmpfiles.org/dl/");
     }
     console.error("Unexpected tmpfiles.org response:", JSON.stringify(data));
@@ -122,4 +125,4 @@ function arrayBufferToBase64(buffer) {
     binary += String.fromCharCode.apply(null, chunk);
   }
   return btoa(binary);
-      }
+       }
