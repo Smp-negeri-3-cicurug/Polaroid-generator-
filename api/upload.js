@@ -1,4 +1,4 @@
-// ✅ Polaroid Generator - Edge Runtime (PostImages Upload)
+// ✅ Polaroid Generator - Edge Runtime (upload -> tmpfiles.org)
 export const config = {
   runtime: "edge",
 };
@@ -15,38 +15,36 @@ export default async function handler(req) {
   }
 
   if (req.method !== "POST") {
-    return new Response(JSON.stringify({ error: "Method not allowed" }), {
-      status: 405,
-      headers: corsHeaders,
-    });
+    return new Response(
+      JSON.stringify({ error: "Method not allowed" }),
+      { status: 405, headers: corsHeaders }
+    );
   }
 
   try {
     const { img1, img2 } = await req.json();
     if (!img1 || !img2) {
       return new Response(
-        JSON.stringify({ error: "Kedua gambar (img1 & img2) wajib dikirim" }),
+        JSON.stringify({ error: "Both img1 and img2 are required" }),
         { status: 400, headers: corsHeaders }
       );
     }
 
-    // === STEP 1: Upload ke POSTIMAGES.ORG ===
-    console.log("⬆️ Uploading ke PostImages...");
-    const url1 = await uploadToPostImages(img1);
-    const url2 = await uploadToPostImages(img2);
+    // Upload ke tmpfiles.org
+    const url1 = await uploadToTmpFiles(img1);
+    const url2 = await uploadToTmpFiles(img2);
+    if (!url1 || !url2) throw new Error("Upload ke tmpfiles.org gagal");
 
-    if (!url1 || !url2) throw new Error("Gagal upload ke postimages.org");
-
-    // === STEP 2: Generate Polaroid ===
-    console.log("🎨 Membuat Polaroid...");
+    // Panggil API Polaroid
     const apiUrl = `https://api.zenzxz.my.id/api/maker/polaroid?img1=${encodeURIComponent(
       url1
     )}&img2=${encodeURIComponent(url2)}`;
 
-    const response = await fetch(apiUrl);
-    if (!response.ok) throw new Error("Gagal memproses API Polaroid");
+    const result = await fetch(apiUrl);
+    if (!result.ok) throw new Error("Gagal memproses API Polaroid");
 
-    const arrayBuffer = await response.arrayBuffer();
+    const arrayBuffer = await result.arrayBuffer();
+    // convert ArrayBuffer -> base64
     const base64Image = btoa(
       String.fromCharCode(...new Uint8Array(arrayBuffer))
     );
@@ -58,52 +56,52 @@ export default async function handler(req) {
         result: dataUrl,
         urls: { img1: url1, img2: url2 },
       }),
-      {
-        status: 200,
-        headers: { ...corsHeaders, "Content-Type": "application/json" },
-      }
+      { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } }
     );
   } catch (err) {
     console.error("❌ Error:", err);
     return new Response(
-      JSON.stringify({
-        error: "Gagal membuat polaroid",
-        message: err.message,
-      }),
+      JSON.stringify({ error: "Gagal membuat polaroid", message: err.message }),
       { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
     );
   }
 }
 
-// ==========================
-// 🔧 Helper: Upload ke PostImages
-// ==========================
-async function uploadToPostImages(base64Image) {
+// Helper: upload base64 image to tmpfiles.org using FormData + Blob
+async function uploadToTmpFiles(base64Image) {
   try {
-    // ✅ Perbaikan regex — HAPUS double backslash
+    // bersihkan data URL prefix
     const cleanBase64 = base64Image.replace(/^data:image\/\w+;base64,/, "");
-    const byteCharacters = atob(cleanBase64);
-    const byteNumbers = new Array(byteCharacters.length);
-    for (let i = 0; i < byteCharacters.length; i++) {
-      byteNumbers[i] = byteCharacters.charCodeAt(i);
-    }
-    const blob = new Blob([new Uint8Array(byteNumbers)], { type: "image/jpeg" });
+    const binary = atob(cleanBase64);
+    const len = binary.length;
+    const bytes = new Uint8Array(len);
+    for (let i = 0; i < len; i++) bytes[i] = binary.charCodeAt(i);
 
-    const formData = new FormData();
-    formData.append("file", blob, `image-${Date.now()}.jpg`);
+    const blob = new Blob([bytes], { type: "image/jpeg" });
+    const form = new FormData();
+    form.append("file", blob, `image-${Date.now()}.jpg`);
 
-    const uploadRes = await fetch("https://postimages.org/json/rr", {
+    const uploadRes = await fetch("https://tmpfiles.org/api/v1/upload", {
       method: "POST",
-      body: formData,
+      body: form,
     });
 
-    if (!uploadRes.ok) throw new Error("Upload ke postimages gagal");
+    if (!uploadRes.ok) {
+      console.error("tmpfiles responded:", uploadRes.status, await uploadRes.text());
+      throw new Error("Upload ke tmpfiles gagal (network)");
+    }
 
     const data = await uploadRes.json();
-    const url = data?.url?.replace("postimg.cc/", "i.postimg.cc/");
-    return url || null;
-  } catch (err) {
-    console.error("Upload error:", err);
+    // contoh respons: { status: "success", data: { url: "https://tmpfiles.org/abcd/filename.jpg", ... } }
+    if (data.status === "success" && data.data?.url) {
+      // convert to direct dl link: tmpfiles.org/ -> tmpfiles.org/dl/
+      return data.data.url.replace("tmpfiles.org/", "tmpfiles.org/dl/");
+    }
+
+    console.error("tmpfiles returned unexpected:", data);
+    return null;
+  } catch (e) {
+    console.error("Upload error:", e);
     return null;
   }
-}
+                }
